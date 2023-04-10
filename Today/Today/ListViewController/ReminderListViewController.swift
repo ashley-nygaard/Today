@@ -42,13 +42,16 @@ class ReminderListViewController: UICollectionViewController {
     // not showing the item user tapped as selected so return false. Will show details instead
     override func collectionView ( _ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         let id = reminders[indexPath.item].id
-        pusshDetailViewForReminder(withId: id)
+        pushDetailViewForReminder(withId: id)
         return false
     }
     
-    func pusshDetailViewForReminder(withId id: Reminder.ID) {
+    func pushDetailViewForReminder(withId id: Reminder.ID) {
         let reminder = reminder(withId: id)
-        let viewController = ReminderViewController(reminder: reminder)
+        let viewController = ReminderViewController(reminder: reminder) { [weak self] reminder in
+            self?.updateReminder(reminder)
+            self?.updateSnapshot(reloading: [reminder.id])
+        }
         // push new view controller onto navigation control stack
         navigationController?.pushViewController(viewController, animated: true)
     }
