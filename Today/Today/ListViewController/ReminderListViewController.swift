@@ -10,17 +10,30 @@ import UIKit
 class ReminderListViewController: UICollectionViewController {
 
     var dataSource: DataSource!
-    var reminders : [Reminder] = Reminder.sampleData
+    var reminders: [Reminder] = Reminder.sampleData
     var listStyle: ReminderListStyle = .today
     var filteredReminders: [Reminder] {
-        return reminders.filter{listStyle.shouldInclude(date: $0.dueDate)}.sorted{$0.dueDate < $1.dueDate}
+        return reminders.filter { listStyle.shouldInclude(date: $0.dueDate) }.sorted {
+            $0.dueDate < $1.dueDate
+        }
     }
-    let listStyleSegmentedControl = UISegmentedControl(items:  [ ReminderListStyle.today.name, ReminderListStyle.future.name, ReminderListStyle.all.name ] )
-  
-    
+    let listStyleSegmentedControl = UISegmentedControl(items: [
+        ReminderListStyle.today.name, ReminderListStyle.future.name, ReminderListStyle.all.name
+    ])
+    var headerView: ProgressHeaderView?
+    var progress: CGFloat {
+        let chunkSize = 1.0 / CGFloat(filteredReminders.count)
+        let progress = filteredReminders.reduce(0.0) {
+            let chunk = $1.isComplete ? chunkSize : 0
+            return $0 + chunk
+        }
+        return progress
+    }
     
     override func viewDidLoad() {
         super.viewDidLoad()
+        
+        collectionView.backgroundColor = .todayGradientFutureBegin
         // Do any additional setup after loading the view.
         let listLayout = listLayout()
         collectionView.collectionViewLayout = listLayout
@@ -32,7 +45,18 @@ class ReminderListViewController: UICollectionViewController {
             //reuse cells allows better performace with vast number of items
             return collectionView.dequeueConfiguredReusableCell(using: cellRegistration, for: indexPath, item: itemIdenfifier)
         }
-      
+        
+//        let headerRegistration = UICollectionView.SupplementaryRegistration(elementKind: ProgressHeaderView.elementKind, handler: supplementaryRegistrationHandler)
+//       // configures and returns supp header view from diffable data source
+//        dataSource.supplementaryViewProvider = { supplementaryView, elementKind, indexPath in
+//            return self.collectionView.dequeueConfiguredReusableSupplementary(using: headerRegistration, for: indexPath)
+//        }
+        let headerRegistration = UICollectionView.SupplementaryRegistration(
+            elementKind: ProgressHeaderView.elementKind, handler: supplementaryRegistrationHandler)
+        dataSource.supplementaryViewProvider = { supplementaryView, elementKind, indexPath in
+            return self.collectionView.dequeueConfiguredReusableSupplementary(
+                using: headerRegistration, for: indexPath)
+        }
         let addButton = UIBarButtonItem(barButtonSystemItem: .add, target: self, action: #selector(didPressAddButton(_:)))
         addButton.accessibilityLabel = NSLocalizedString("Add reminder", comment: "Add button accessibilty label")
         navigationItem.rightBarButtonItem = addButton
@@ -48,9 +72,11 @@ class ReminderListViewController: UICollectionViewController {
         updateSnapshot()
         collectionView.dataSource = dataSource
     }
+    
     private func listLayout() -> UICollectionViewCompositionalLayout {
         // creates a section in a list layout
         var listConfiguration = UICollectionLayoutListConfiguration(appearance: .grouped)
+        listConfiguration.headerMode = .supplementary
         listConfiguration.showsSeparators = false
         listConfiguration.trailingSwipeActionsConfigurationProvider = makeSwipeActions
         listConfiguration.backgroundColor = .clear
@@ -59,12 +85,39 @@ class ReminderListViewController: UICollectionViewController {
         
     }
     
+    override func viewWillAppear(_ animated: Bool) {
+        super.viewWillAppear(animated)
+        refreshBackground()
+    }
+    
     // not showing the item user tapped as selected so return false. Will show details instead
     override func collectionView ( _ collectionView: UICollectionView, shouldSelectItemAt indexPath: IndexPath) -> Bool {
         let id = filteredReminders[indexPath.item].id
         pushDetailViewForReminder(withId: id)
         return false
     }
+    
+    override func collectionView(
+        _ collectionView: UICollectionView, willDisplaySupplementaryView view: UICollectionReusableView,
+        forElementKind elementKind: String, at indexPath: IndexPath
+    ) {
+        guard elementKind == ProgressHeaderView.elementKind,
+              let progressView = view as? ProgressHeaderView
+        else {
+            return
+        }
+        progressView.progress = progress
+    }
+    
+    func refreshBackground(){
+        collectionView.backgroundView = nil
+        let backgroundView = UIView()
+        let gradientLayer = CAGradientLayer.gradientLayer(for: listStyle, in: collectionView.frame)
+        backgroundView.layer.addSublayer(gradientLayer)
+        collectionView.backgroundView = backgroundView
+    }
+    
+    
     
     func pushDetailViewForReminder(withId id: Reminder.ID) {
         let reminder = reminder(withId: id)
@@ -92,5 +145,10 @@ class ReminderListViewController: UICollectionViewController {
       }
       return UISwipeActionsConfiguration(actions: [deleteAction])
     }
+    
+    private func supplementaryRegistrationHandler(progressView: ProgressHeaderView, elementKind: String, indexPath: IndexPath) {
+        headerView = progressView
+    }
+    
 }
 
