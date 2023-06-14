@@ -41,4 +41,8 @@ extension ReminderListViewController {
         updateSnapshot()
         refreshBackground()
     }
+  
+    @objc func eventStoreChanged(_ notification: NSNotification){
+        reminderStoreChanged()
+    }
 }
