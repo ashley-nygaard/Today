@@ -26,12 +26,18 @@ final class ReminderStore {
     case .restricted:
       throw TodayError.accessRestricted
     case .notDetermined:
-      let accessGranted = try await ekStore.requestAccess(to: .reminder)
-      guard accessGranted else {
-        throw TodayError.accessDenied
-      }
+        if #available(iOS 17.0, *) {
+            let accessGranted = try await ekStore.requestWriteOnlyAccessToEvents()
+            guard accessGranted else {
+                throw TodayError.accessDenied
+            }
+        }
     case .denied:
       throw TodayError.accessDenied
+    case .fullAccess:
+        return
+    case .writeOnly:
+        return
     @unknown default:
     throw TodayError.unknown
     }
@@ -45,13 +51,13 @@ final class ReminderStore {
     let predicate = ekStore.predicateForReminders(in: nil)
     let ekReminders = try await ekStore.reminders(matching: predicate)
     // compactMap works as a filter and map
-    let reminders: [Reminder] = try ekReminders.compactMap{ ekReminder in
-      do {
-        return try Reminder(with: ekReminder)
-      } catch TodayError.reminderHasNoDueDate {
-        return nil
+    let reminders: [Reminder] = try ekReminders.compactMap { ekReminder in
+        do {
+            return try Reminder(with: ekReminder)
+        } catch TodayError.reminderHasNoDueDate {
+            return nil
+        }
       }
-    }
     return reminders
   }
   
